@@ -15,6 +15,7 @@ const defaultSettings = {
   openRouterApiKey: "",
   localEmbeddingUrl: "",
   localEmbeddingApiKey: "",
+  localEmbeddingModel: "",
   embeddingModel: "text-embedding-3-large",
   customEmbeddingDimensions: null,
   memoryLimit: 5,
@@ -654,6 +655,17 @@ async function generateEmbedding(text) {
       url = settings.localEmbeddingUrl.trim()
       if (settings.localEmbeddingApiKey && settings.localEmbeddingApiKey.trim()) {
         headers.Authorization = `Bearer ${settings.localEmbeddingApiKey.trim()}`
+      }
+      // Override model name if a local model is specified
+      const localModel = settings.localEmbeddingModel?.trim()
+      if (localModel) {
+        body.model = localModel
+      }
+      // Ollama uses 'prompt' instead of OpenAI's 'input'
+      const isOllama = url.includes("/api/embeddings") || url.includes("11434")
+      if (isOllama) {
+        body.prompt = text
+        delete body.input
       }
     } else {
       console.error(`[Qdrant Memory] Unsupported embedding provider: ${provider}`)
@@ -2210,6 +2222,14 @@ function createSettingsUI() {
                 <small style="color: #666;">Endpoint that accepts OpenAI-compatible embedding requests</small>
             </div>
 
+            <div id="qdrant_local_model_group" style="margin: 10px 0; display: none;">
+                <label><strong>Local Model Name:</strong></label>
+                <input type="text" id="qdrant_local_model" class="text_pole" value="${settings.localEmbeddingModel}"
+                       placeholder="e.g. nomic-embed-text, mxbai-embed-large"
+                       style="width: 100%; margin-top: 5px;" />
+                <small style="color: #666;">Required for Ollama. The model name to pass in the request body.</small>
+            </div>
+
             <div id="qdrant_local_api_key_group" style="margin: 10px 0; display: none;">
                 <label><strong>Embedding API Key (optional):</strong></label>
                 <input type="password" id="qdrant_local_api_key" class="text_pole" value="${settings.localEmbeddingApiKey}"
@@ -2402,6 +2422,7 @@ function createSettingsUI() {
     const $openAIGroup = $("#qdrant_openai_key_group")
     const $openRouterGroup = $("#qdrant_openrouter_key_group")
     const $localGroup = $("#qdrant_local_url_group")
+    const $localModelGroup = $("#qdrant_local_model_group")
     const $localApiKeyGroup = $("#qdrant_local_api_key_group")
     const $localDimensionsGroup = $("#qdrant_local_dimensions_group")
     const $localDimensionsInput = $("#qdrant_local_dimensions")
@@ -2410,6 +2431,7 @@ function createSettingsUI() {
     $openAIGroup.toggle(provider === "openai")
     $openRouterGroup.toggle(provider === "openrouter")
     $localGroup.toggle(provider === "local")
+    $localModelGroup.toggle(provider === "local")
     $localApiKeyGroup.toggle(provider === "local")
     $localDimensionsGroup.toggle(provider === "local")
 
@@ -2457,6 +2479,10 @@ function createSettingsUI() {
 
   $("#qdrant_local_url").on("input", function () {
     settings.localEmbeddingUrl = $(this).val()
+  })
+
+  $("#qdrant_local_model").on("input", function () {
+    settings.localEmbeddingModel = $(this).val()
   })
 
   $("#qdrant_local_api_key").on("input", function () {
